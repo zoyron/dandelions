@@ -1,0 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply m-0 font-cormorant text-light overflow-x-hidden bg-primary;
+}
+
+.content-section {
+  opacity: 0;
+  transform: translateY(50px);
+  transition: all 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.content-section.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.feature-card {
+  @apply bg-opacity-10 backdrop-blur-lg transition-all duration-500 ease-out border border-accent border-opacity-20;
+}
+
+.feature-card:hover {
+  @apply -translate-y-1 bg-opacity-20 border-opacity-30;
+}
