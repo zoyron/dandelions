@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import * as THREE from 'three';
+import { useEffect, useRef } from "react";
+import * as THREE from "three";
 
 function DandelionScene() {
   const canvasRef = useRef();
@@ -7,6 +7,8 @@ function DandelionScene() {
   const isScatteringRef = useRef(false);
   const scatterIntensityRef = useRef(0);
   const lastScrollYRef = useRef(0);
+  // Add a ref to control return speed
+  const returnSpeedRef = useRef(0.009); // Much slower than the original 0.015
 
   useEffect(() => {
     let camera, scene, renderer, particles, stem;
@@ -100,15 +102,21 @@ function DandelionScene() {
 
       const thickness = 0.2;
       const segments = 8;
-      const thickGeometry = new THREE.TubeGeometry(curve, 50, thickness, segments, false);
+      const thickGeometry = new THREE.TubeGeometry(
+        curve,
+        50,
+        thickness,
+        segments,
+        false
+      );
 
       const stemMaterial = new THREE.ShaderMaterial({
         uniforms: {
-          time: { value: 0 }
+          time: { value: 0 },
         },
         vertexShader: stemVertexShader,
         fragmentShader: stemFragmentShader,
-        transparent: true
+        transparent: true,
       });
 
       stem = new THREE.Mesh(thickGeometry, stemMaterial);
@@ -118,8 +126,13 @@ function DandelionScene() {
     function init() {
       clock = new THREE.Clock();
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0A0A0A);
-      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      scene.background = new THREE.Color(0x0a0a0a);
+      camera = new THREE.PerspectiveCamera(
+        60,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
       camera.position.z = 70;
       camera.position.y = 10;
 
@@ -127,7 +140,7 @@ function DandelionScene() {
         canvas: canvasRef.current,
         antialias: true,
         alpha: true,
-        powerPreference: "high-performance"
+        powerPreference: "high-performance",
       });
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -167,12 +180,18 @@ function DandelionScene() {
         sizes[i] = 1.5 + Math.random() * 2.5;
       }
 
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geometry.setAttribute('customColor', new THREE.BufferAttribute(colors, 3));
-      geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+      geometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(positions, 3)
+      );
+      geometry.setAttribute(
+        "customColor",
+        new THREE.BufferAttribute(colors, 3)
+      );
+      geometry.setAttribute("size", new THREE.BufferAttribute(sizes, 1));
 
       uniforms = {
-        time: { value: 0 }
+        time: { value: 0 },
       };
 
       const material = new THREE.ShaderMaterial({
@@ -181,36 +200,61 @@ function DandelionScene() {
         fragmentShader,
         transparent: true,
         blending: THREE.AdditiveBlending,
-        depthTest: false
+        depthTest: false,
       });
 
       particles = new THREE.Points(geometry, material);
       scene.add(particles);
 
-      sceneRef.current = { scene, camera, renderer, particles, geometry, uniforms, stem, originalPositions, velocities };
+      sceneRef.current = {
+        scene,
+        camera,
+        renderer,
+        particles,
+        geometry,
+        uniforms,
+        stem,
+        originalPositions,
+        velocities,
+      };
     }
 
     function handleScroll() {
       const currentScrollY = window.scrollY;
       const scrollDelta = Math.abs(currentScrollY - lastScrollYRef.current);
-      
-      if (scrollDelta > 5) {
+
+      if (scrollDelta > 2) {
         isScatteringRef.current = true;
-        scatterIntensityRef.current = Math.min(scrollDelta * 0.05, 1.5);
+        scatterIntensityRef.current = Math.min(scrollDelta * 0.15, 1.5);
+
+        // Gradually increase return speed if continuous scrolling
+        returnSpeedRef.current = Math.max(0.001, returnSpeedRef.current * 0.95);
       }
-      
+
       lastScrollYRef.current = currentScrollY;
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => {
         isScatteringRef.current = false;
+        // Reset return speed to very slow when scrolling stops
+        returnSpeedRef.current = 0.003;
       }, 100);
     }
 
     function animate() {
       if (!sceneRef.current) return;
-      
-      const { scene, camera, renderer, particles, geometry, uniforms, stem, originalPositions, velocities } = sceneRef.current;
-      
+
+      const {
+        scene,
+        camera,
+        renderer,
+        particles,
+        geometry,
+        uniforms,
+        stem,
+        originalPositions,
+        velocities,
+      } = sceneRef.current;
+
       requestAnimationFrame(animate);
 
       const time = clock.getElapsedTime();
@@ -222,15 +266,33 @@ function DandelionScene() {
       if (isScatteringRef.current) {
         for (let i = 0; i < positions.length; i += 3) {
           positions[i] += velocities[i] * 0.2 * scatterIntensityRef.current;
-          positions[i + 1] += velocities[i + 1] * 0.2 * scatterIntensityRef.current;
-          positions[i + 2] += velocities[i + 2] * 0.2 * scatterIntensityRef.current;
+          positions[i + 1] +=
+            velocities[i + 1] * 0.2 * scatterIntensityRef.current;
+          positions[i + 2] +=
+            velocities[i + 2] * 0.2 * scatterIntensityRef.current;
         }
       } else {
+        // Use the slower return speed from the ref
+        const currentReturnSpeed = returnSpeedRef.current;
+
         for (let i = 0; i < positions.length; i += 3) {
-          positions[i] += (originalPositions[i] - positions[i]) * 0.015;
-          positions[i + 1] += (originalPositions[i + 1] - positions[i + 1]) * 0.015;
-          positions[i + 2] += (originalPositions[i + 2] - positions[i + 2]) * 0.015;
-          
+          // Calculate distance from current to original position
+          const dx = originalPositions[i] - positions[i];
+          const dy = originalPositions[i + 1] - positions[i + 1];
+          const dz = originalPositions[i + 2] - positions[i + 2];
+
+          // Apply a return speed that gradually increases as particles get closer to home
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          const returnFactor = Math.max(
+            currentReturnSpeed,
+            currentReturnSpeed * (1 + 5 / (distance + 0.1))
+          );
+
+          positions[i] += dx * returnFactor;
+          positions[i + 1] += dy * returnFactor;
+          positions[i + 2] += dz * returnFactor;
+
+          // Keep the gentle wave movement
           positions[i] += Math.sin(time * 0.5 + i * 0.1) * 0.01;
           positions[i + 1] += Math.cos(time * 0.3 + i * 0.05) * 0.01;
           positions[i + 2] += Math.sin(time * 0.4 + i * 0.07) * 0.01;
@@ -244,7 +306,7 @@ function DandelionScene() {
 
     function handleResize() {
       if (!sceneRef.current) return;
-      
+
       const { camera, renderer } = sceneRef.current;
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -254,36 +316,36 @@ function DandelionScene() {
     init();
     animate();
 
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("scroll", handleScroll);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("scroll", handleScroll);
       if (sceneRef.current) {
         // Properly dispose of Three.js resources
         const { scene, renderer, geometry, particles, stem } = sceneRef.current;
-        
+
         // Dispose of geometries
         geometry.dispose();
         stem.geometry.dispose();
-        
+
         // Dispose of materials
         particles.material.dispose();
         stem.material.dispose();
-        
+
         // Remove objects from scene
         scene.remove(particles);
         scene.remove(stem);
-        
+
         // Dispose of renderer
         renderer.dispose();
-        
+
         // Clear the scene
-        while(scene.children.length > 0) {
+        while (scene.children.length > 0) {
           scene.remove(scene.children[0]);
         }
-        
+
         // Clear the reference
         sceneRef.current = null;
       }
